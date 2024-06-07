@@ -1,7 +1,7 @@
 ---
 title: "Broughton ecological classification"
 author: "Edward Gregr"
-date: "May 01 2024"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
   html_document: 
     keep_md: yes
@@ -32,42 +32,57 @@ From the Broughton RSSM proposal, the objective is to classify the study area in
 Following the methods of Mora-Soto et al. 2024, create a k-means clustering of biophysical layers to support the representation of kelp habitat in British Columbia, with a particular focus on the Broughton region.
 
 ## Data summary
-A collection of 20x20 m2 coastal TIFFs to be classified using k-means. Homemade masks (2) of restrictions to the study area as shape files.  
 
-```{r Data_Load, include=FALSE, echo=FALSE}
-# Spatial data are loaded as TIFFs
-# Study area masks are imported as two shape files with one feature each. 
+# Source data
 
-
-#---------------------
-# DATA CLEAN UP
-#dim( new.data )
-#rm( clean.dat )
-
-
-#--------------------------------------------
-#--- Part 1: Explore cluster number with scree plot and 
-
-
+Dimensions of the loaded Raster stack.
+```{r echo=FALSE}
+dim(prepped_layers)
 ```
-After Loading, I cleaned and classified the data brick.
 
-```{r DataSummary, warning=FALSE, message=FALSE, echo=FALSE}
+Plot the source data and corresponding histograms for validation.
+```{r echo=FALSE}
+#-- Visualize source data
+#plot( prepped_layers )
+raster::hist(prepped_layers, nclass=50)
+par(mfrow = c(1, 1))
+```
 
-# Building a table. I remember this being fun ... :\
 
-#xx <- table( clean.dat$ORIGIN )
-#xx <- c( xx, sum(xx))
-#data.frame("Group"=c("Fry", "Marked smolts", "Unmarked smolts", "Total"),
-#           "N"= as.vector(xx)) %>% kable( caption = "Total number of stomachs for each of three life history groups." #)
+```{r echo=FALSE}
+#-- Quick correlation across data layers
+#x <- getValues( prepped_layers )
+x_clean <- x[ complete.cases(x), ]
+#y <- cor( x_clean )
+
+y_low <- lower.tri(y, diag = TRUE)
+y[ y_low ] <- NA
+y
+
+kable( y, caption = "Correlation matrix for assessing predictor cross-correlations")
+
+high_rows <- apply(y, 1, function(row) any(row > 0.6, na.rm = TRUE))
+z <- y[ high_rows, ]
+z
+
+kable( z, caption = "Predictor variables that exceed 0.6 threshold")
 
 #xx <- table( new.data$ORIGIN, new.data$INOR )
-#xx <- rbind( xx, colSums(xx))
 #rownames(xx) <- c("Fry", "Marked smolts", "Unmarked smolts", "Total")
 #colnames(xx) <- c("Absent", "Present")
 #kable( xx, caption = "Presence/absence of inorganic matter in stomach samples by life history groups.")
+
 ```
 
+__*Figure 1: Scree plot showing the total within sum-of-squares across a range of cluster numbers.*__
+```{r Part2_ScreePlot, warning=FALSE, message=FALSE, echo=FALSE}
+plotme
+```
+
+__*Figure 2: Heat map showing within cluster standard deviation of the predictors.*__
+```{r Part2_HeatMap, warning=FALSE, message=FALSE, echo=FALSE}
+z_heat
+```
 
 NOTES:  
 1) ... 
@@ -82,8 +97,14 @@ To compare classifications across different spatial extents.
 <!-- Is this a text comment?
 <!-- ``` -->
 
-NOTES:  
-More notes.
+__*Figure 3: Silhouette plot showing pixel membership in each cluster and silhouette widths.*__
+```{r Part2_DataSummary, warning=FALSE, message=FALSE, echo=FALSE}
+plot(sk, col = 1:nclust, border=NA )
+```
+
+
+
+
 
 ## R packages
 

@@ -1,5 +1,5 @@
 #################################################################################
-# Script:  Broughton_main.R
+# Script:  Broughton2_main.R
 # Created: February 2024. EJG
 # 
 # This script sources the necessary libraries and functions, coordinates the 
@@ -7,217 +7,164 @@
 # So the idea is to run bits in here, and then 'Render' the RMD script. 
 # Seems straightforward. :)
 #
-#
-# Updates: 
+## Updates: 
 # 2024/04/29: Steady development past few weeks; alll necessary pieces now developed. 
 # 2024/04/29: Git repo created and working version pushed prior to RMarkdown development.
 # 2024/05/02: Completed smoothing pass thru code; sorted raster plotting. Pushed.
 # 2024/05/07: Another pass thru, adding some controls. Ready for RMD work.Pushed.
+# 2024/05/29: After some exploratory work with Romina's tifs from SPECTRAL lab, forked the 
+#   code so this version focuses on the LSSM needs.
+# 2024/06/05: Updated with relevant code from latest DFO version.
 
 # TO DO: 
 #  Design RMD report
 #  Add config section to allow an RMD report to be built for selected extents.
 #################################################################################
 
-print('Starting Broughton ...')
+print('Starting Broughton2 ...')
 rm(list=ls(all=T))  # Erase environment.
 
 # Load necessary packages and functions ... 
-source( "broughton_functions.R" )
+source( "broughton2_functions.R" )
 # source( "Plot_Functions.R" )
 
 # Processing FLAGS. When set to true, the data structure will be re-built from imported data. 
 # Otherwise, it will be loaded from rData. Watch for dependencies.
 
 loadtifs <- F
-clipdata <- T # True if a spatial subset of the data is desired. Requires a polygon shape file. 
-scaledat <- T # only needed if new layers loaded 
+clipdata <- F # True if a spatial subset of the data is desired. Requires a polygon shape file. 
+scaledat <- F # only needed if new layers loaded 
 
-
-#---- Part 1 of 8: Load, clean, and display rasters for processing  ----
+#---- Part 1 of 3: Load, clean, and prepare predictor data.  ----
 # If loadtifs == TRUE then run all this else load the processed data.
 
 tif_stack <- stack()
-dat_brick <- brick()
+today <- format(Sys.Date(), "%Y-%m-%d")
 
 if (loadtifs) {
   print( "Loading predictors ... ")
-  tif_stack <- LoadPredictors( raster_dir )
-
-  today <- format(Sys.Date(), "%Y-%m-%d")
-  save( tif_stack, file = paste0( data_dir, '/source_rasters_', today, '.rData' ))
-  print( "Data saved. ")
-
-  dat_brick <- tif_stack
+  src_stack <- LoadPredictors2( raster_dir )
+  print( "Data loaded.")
+  
+  tif_stack <- src_stack
   
   if (clipdata) {
-#    maskme <- shapefile("C:\\Data\\SpaceData\\Broughton\\broughton_small.shp")
-    maskme <- shapefile("C:\\Data\\SpaceData\\Broughton\\broughton_smaller.shp")
-    tmp_stack <-  ClipPredictors( tif_stack, maskme )
-    dat_brick <- tmp_stack
-  } else {
-    dat_brick <- tif_stack
+    print( "clipping TIFs ... ")
+    #amask <- shapefile("C:\\Data\\SpaceData\\Broughton\\broughton_small.shp")
+    amask <- shapefile("C:\\Data\\SpaceData\\Broughton\\broughton_smaller.shp")
+    tif_stack <- ClipPredictors( tif_stack, amask )
+    print('Rasters clipped.')
+  }
+ 
+#  Romina's Ocean TIFs already trimmed to 40 m and did not contain any land.  
+#  IF we want to include any DFO data once delivered, 
+  # then will need to match Romina's spatial reference.
+
+  if (scaledat) {
+    print( "Scaling TIFs ... ")
+    tmp_stack <- scale( tif_stack )
+    tif_stack <- tmp_stack
+    print('Rasters Scaled.')
   }
   
-  if (scaledat){
-    print( "Scaling TIFs ... ")
-    tmp_stack <- ScalePredictors( dat_brick )
-    dat_brick <- tmp_stack
-  }
-
-  } else {
+  save( src_stack, file = paste0( data_dir, '/src_stack_', today, '.rData' ))
+  save( tif_stack, file = paste0( data_dir, '/tif_stack_', today, '.rData' ))
+  save( tif_stack, file = paste0( data_dir, '/tifs_SPECTRAL_scaled_', today, '.rData' ))
+  
+} else {
   print( 'Loading project data ... ')
-  load( paste0( data_dir, '/source_rasters_2024-05-27.rData' ))
+  # Ideally meaningfully named and tested so no source is required.
+  load( paste0( data_dir, '/tifs_SPECTRAL_scaled_2024-06-05.rData' ))
 }
- 
-# TIF and DAT stacks created.
 
-### NOTE: All layers in the brick have the same geometry!
-### NOTE: There is an interaction here with scaling. Perhaps integerization should be first?
+
+#---- Final data preparation ----
+#NOTE: Everything from here down is in scaled units. 
+
+#-- Intergerize scaled data to reduce data size and improve performance. 
+# NOTE: 2024/06/03: Integerize throws a warning (layers with no data) on the MSEA data set.
+#   but no problem evident in results. Less useful with trimmed data, but may still have 
+#   value for larger data sets.
+#prepped_layers <- Integerize( tif_stack )
 
 names(tif_stack)
-names(dat_brick)
+# Select specific layers from the SPECRAL data set
+use_layers <- stack( tif_stack$julST_ave, tif_stack$julBT_ave, tif_stack$tidal_cur,
+                     tif_stack$julSS_ave, tif_stack$julBS_ave, tif_stack$julSSpd_ave)
 
-
-# Intergerize scaled data to reduce data size and improve performance. 
-prepped_layers <- Integerize( dat_brick )
-save_brick <- brick( prepped_layers )
-today <- format(Sys.Date(), "%Y-%m-%d")
-save( save_brick, file = paste0( data_dir, '/prepped_brick_MSEA_QCS', today, '.rData' ))
-
-
-prepped_layers <- stack( save_brick )
-
+prepped_layers <- use_layers
 
 dim(prepped_layers)
 names(prepped_layers)
 
+#-- Visualize source data
 plot( prepped_layers )
 raster::hist(prepped_layers, nclass=50)
 par(mfrow = c(1, 1))
 
-# Quick correlation across data layers
+#-- Quick correlation across data layers
 x <- getValues( prepped_layers )
 x_clean <- x[ complete.cases(x), ]
 y <- cor( x_clean )
+
+y_low <- lower.tri(y, diag = TRUE)
+y[ y_low ] <- NA
 y
 
-# Remove highly correlated layers.
-  # Drop rugosity for now ... 
-prepped_layers <- dropLayer( prepped_layers, c("rugosity" ))
-
-prepped_layers <- dropLayer( prepped_layers, c("julBSpd_ave", "julBT_ave", "julSS_ave",
-                        "julSS_min", "julSSpd_ave", "julST_ave", "julST_max", "northness", "tidal_cur") ) 
-
-# All prepped_layers have same length of values 
+high_rows <- apply(y, 1, function(row) any(row > 0.6, na.rm = TRUE))
+z <- y[ high_rows, ]
+z
 
 
-#---- Part 2 of 8: Final data preparation ----
+#-- Remove any unwanted layers.
+#names( tif_stack)
+#prepped_layers <- dropLayer( prepped_layers, "rugosity" )
+
+names( prepped_layers )
 
 
-# Final data adjustments 
-
+#-- Finalize the data for exploring and creating the clusters.
 # Extract the data for the cluster analyses
-stack_data   <- getValues( prepped_layers )
-
+stack_data <- getValues( prepped_layers )
 # remove any rows with an NA
-# NB: This decouples the data from the RasterStack and 
-#   needs to be put back together for some analyses below.
-# ALSO: Blows up with a single layer in the stack 
+# NB: This decouples the data from the RasterStack and requires re-assembly for mapping
 
-
+# THESE are the two key data structures used in subsequent steps
 clean_idx <- complete.cases(stack_data)
 stack_data_clean <- stack_data[ clean_idx, ]
 
-dim(stack_data)
+dim( stack_data )
+dim( stack_data_clean )
 
-#na_positions <- apply(stack_data, 1, anyNA) # takes a long time ... 
-na_positions <- !clean_idx 
-
-str(stack_data)
-length(stack_data)
-length(clean_idx)
-length(na_positions)
-
-SO ... complete.cases() appears to be working ... 
-
-
-
-
-#---- Part 3 of 8: Explore number of clusters using Within-sum-of-squares plot ----
-# Run multiple times with different number of clusters
-# Initialize total within sum of squares errors: wss
+#---- Part 2 of 3: Cluster number selection ----
 
 set.seed <- 42 # Seed for reproducibility
 randomz  <- 20 # the number of randomizations for kmeans to do.
 imax     <- 25 # maximum iterations to try for convergence
-nclust   <- 18 # number of clusters for scree plot
 
-# Needs a subsample to run reasonably. Running all data is minutes per iteration ... 
-#*** Deal with the warnings from kmeans
-plotme <- MakeScreePlot( stack_data_clean, nclust, randomz, imax, 25000 )
+#---- Part 2a: Explore number of clusters using Within-sum-of-squares scree plot ----
+# Runs kmeans with increasing number of clusters
+
+nclust   <- 18 # number of clusters for scree plot
+nsample  <- 25000 # Scree plot needs a subsample to run reasonably. 
+plotme <- MakeScreePlot( stack_data_clean, nclust, randomz, imax, nsample )
 plotme
 
+#---- Create a working set of N clusters (N based on scree plot) to further assess cluster number. ----
 
-#---- Part 4 of 8: Create and examine the clusters. ----
-nclust <- 4 # the number of clusters based on Part 2, above.
+nclust  <- 6 # the number of clusters based on scree plot, above.
+nsample <- 500000 # a larger sample for more robust classification
 
-# Perform k-means clustering. 500k good for exploration. 
-# The full data set takes a few minutes with above randomz. 
-sidx <- sample( 1:length( stack_data_clean[ , 1] ), 500000 )
+sidx <- sample( 1:length( stack_data_clean[ , 1] ), nsample )
 samp <- stack_data_clean[ sidx, ]
 cluster_result <- kmeans(samp, centers=nclust, nstart=randomz, iter.max=imax) 
 
-# Summary of centres and relationship to predictors 
-cluster_result$centers
-x <- as.data.frame( cluster_result$centers )
-for (i in names(x)){
-  print( paste0( i, ":  ", round( range(x[i])[1], 2), " to ", round( range(x[i])[2], 2 ),
-                "   Extent = ", round( abs( range(x[i])[1] - range(x[i])[2]), 2 )
-        ))
-}
-
-# Expose and examine the cluster results
-# NB: there are ~103M raster cells in the Broughton region. 
-length( cluster_result$cluster )
-
-#---- Part 5 of 8: Examine silhouette plot of the current cluster result ----
-# Requires the data (i.e., cell attributes) and the corresponding assigned cluster
-# Need to subsample from the cluster result above as distance matrix take long time.
-
-# Calculating dissimilarity matrix (dist() below) takes a long time ... 
-# 100000 way to much ... took 30ish min. 50k is ~1 min to completion. 
-silx <- sample( 1:length( samp[ , 1] ), 10000 )
-
-cs <- cluster_result$cluster[ silx ]
-ss <- samp[ silx, ]
-
-c_dist <- dist(ss)
-sk <- silhouette(cs, c_dist) #also timeconsuming ... 
-
-#plot(sk, border=NA )
-par(mfrow = c(1, 1))
-plot(sk, col = 1:nclust, border=NA )
-
-#---- Part 6 of 8: Heat map of within-cluster standard deviations ----
+#---- Part 2b: Create heat map of within-cluster standard deviations ----
 
 # Define color palette
 pal_heat <- rev( brewer.pal(n = nclust, name = "RdYlBu")) # heat map palette
 
-# Create a smaller sample for some of the time-intensive subsequent steps  ... 
-sidx <- sample( 1:length( stack_data_clean[ , 1] ), 10000 )
-samp <- stack_data_clean[ sidx, ]
-# re-run cluster for smaller sample.
-cluster_result <- kmeans(samp, centers = nclust, nstart = randomz) # less than 10 seconds
-csamp <- cluster_result$cluster
-
-# Put the pieces together for the PCA by combining the data and the cluster. 
-# Put cluster # first so easy to find for PCA below
-profile_data <- as.data.frame( cbind(cluster = csamp, samp ) )
-
-dim( profile_data )
-names( profile_data )
-sort( unique( profile_data$cluster ))
+profile_data <- as.data.frame( cbind(cluster = cluster_result$cluster, samp ) )
 
 cluster_sd <- profile_data %>%
   group_by(cluster) %>%
@@ -227,116 +174,112 @@ x <- as.data.frame( cluster_sd )
 head(x)
 xm <- melt( x, id.var = "cluster" )
 
-z <- ggplot(xm, aes(x=cluster, y=variable, fill=value) ) +
+z_heat <- ggplot(xm, aes(x=cluster, y=variable, fill=value) ) +
   geom_tile() +
   scale_fill_gradientn(colours = pal_heat) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
   labs(title = "Within-cluster Standard Deviation", x = "Clusters", y = "Attributes", fill = "Value")
-z
+z_heat
+
+#---- Part 2c: Examine silhouette plot of the WORKING clusters  ----
+# Uses the predictor values and the corresponding assigned cluster
+# Need to subsample from the cluster result above as distance matrix take long time.
+
+# Take a subsample of the clusters and the predictors for the silhouette plot. 
+sil_n <- 10000
+silx <- sample( 1:length( samp[ , 1] ), sil_n )
+
+cs <- cluster_result$cluster[ silx ]
+ss <- samp[ silx, ]
+
+# Calculate a distance matrix between the predictors and plot assigned to each cluster.
+# both these steps are time consuming, hence a smaller sample.
+c_dist <- dist(ss)
+sk <- silhouette(cs, c_dist)
+
+#plot(sk, border=NA )
+par(mfrow = c(1, 1))
+plot(sk, col = 1:nclust, border=NA )
 
 
-#---- Part 7 of 8: Show cluster groupings using PCA ----
-# NB: This takes some time on the full data set. Uses profile_data from Part 5.
-# Use profile data created from samples above. 
+#---- Part 3: Detailed examination of N clusters  ----
+#---- Part 3a: Show cluster groupings using PCA ----
 
-res.pca <- prcomp(profile_data[,-1],  scale = TRUE)
-  # PC coordinates of individual raster cells
-ind.coord <- as.data.frame(get_pca_ind(res.pca)$coord)
-  # Add clusters from the classification
-ind.coord$cluster <- factor( csamp )
-# Data inspection
-head(ind.coord)
+#-- Can take some time so it makes its own cluster 
+pca_n <- 25000
 
-# Percentage of variance explained by dimensions
-eigenvalue <- round(get_eigenvalue(res.pca), 1)
-variance.percent <- eigenvalue$variance.percent
-eigenvalue
+pca_plots <- ClusterPCA( pca_n, nclust ) # uses global variable stack_data_clean
+pca_plots
 
-# Look at the clusters for the first 4 PCs
-ggscatter(
-  ind.coord, x = "Dim.1", y = "Dim.2", 
-  color = "cluster", palette = "simpsons", ellipse = TRUE, ellipse.type = "convex",
-  size = 1.5,  legend = "right", ggtheme = theme_bw(),
-  xlab = paste0("Dim 1 (", variance.percent[1], "% )" ),
-  ylab = paste0("Dim 2 (", variance.percent[2], "% )" )
-) +
-  stat_mean(aes(color = cluster), size = 4)
-
-ggscatter(
-  ind.coord, x = "Dim.3", y = "Dim.4", 
-  color = "cluster", palette = "simpsons", ellipse = TRUE, ellipse.type = "convex",
-  size = 1.5,  legend = "right", ggtheme = theme_bw(),
-  xlab = paste0("Dim 3 (", variance.percent[3], "% )" ),
-  ylab = paste0("Dim 4 (", variance.percent[4], "% )" )
-) +
-  stat_mean(aes(color = cluster), size = 4)
+#Percentage of variance explained by dimensions
+#eigenvalue <- round(get_eigenvalue(res_pca), 1)
+#var_percent <- eigenvalue$variance.percent
 
 
-#---- Part 8 of 8: Spatialize the cluster results ----
-# NB: Here have the option to re-cluster the entire data set for mapping.
-#   Uses iter.max and nstart from above.
+#---- Part 3b: Violins of predictor contributions to WORKING clusters ----
 
-# Prepare a new raster for the cluster visualization
+x <- as.data.frame( samp )
+x$cluster <- as.factor( cluster_result$cluster )
+
+y <- x %>%
+  pivot_longer(cols = -cluster, names_to = "predictor", values_to = "value")
+
+# Create violin plot
+ggplot(y, aes(x = cluster, y = value, fill = cluster)) +
+  geom_violin(trim = FALSE) +
+  facet_wrap(~ predictor, scales = "free_y") +
+  theme_minimal() +
+  labs(title = "Violin Plots of Predictors Across k-means Clusters",
+       x = "Cluster",
+       y = "Value")
+
+
+#---- Part 3c: Spatialize and display the WORKING clusters ----
+# NB: To show a comprehensive map, can either:
+#     a) re-cluster the entire data set (using imax and randomz from above) or
+#     b) Predict to the unsampled portion of the raster. 
+
+reclust = F
+
+# initialize target data structure 
 cluster_raster <- prepped_layers[[1]]
-# dataType(cluster_raster) <- "INT1U" seems to fuck things up somehow ... 
+dataType(cluster_raster) <- "INT1U"
+cluster_raster[] <- NA
 
-length(cluster_result$cluster)
-
-# Flag for re-clustering using all data prior to rebuilding.
-allDat <- T
-if (allDat) {
-  # Cluster the entire data set for mapping ... 
-    # less than 1 min with iter.max = 20, nstart = 20 for smallest region
-  
-  
-  clean_idx <- complete.cases(stack_data)
-  stack_data_clean <- stack_data[ clean_idx, ]
-  na_positions <- !clean_idx
-  
+if (reclust == T) {
+  # Re-cluster using all the clean data  ... 
+  # less than 1 min with iter.max = 20, nstart = 20 for smallest region
   cluster_result <- kmeans(stack_data_clean, centers = nclust, nstart = randomz, iter.max = imax)
   
   # Assign the clustered values ... 
+  # extract values from the target cluster
   new_values <- values( cluster_raster )
+  # replace non-NA values with the cluster results
   new_values[ clean_idx ] <- cluster_result$cluster
+  # put the updated values back on the target cluster
   values( cluster_raster ) <- new_values  
-
-  raster::hist(cluster_result$cluster)
 } else {
-  # This part is a bit harder as need to deal with the sub-sampling ... 
-  
-  
+  values( cluster_raster ) <- transferCluster( values(cluster_raster), cluster_result )
 }
 
-range(cluster_result$cluster)
-cellStats(cluster_raster, range)
+#--- Display the results, first as histogram then as map.  
+raster::hist( values(cluster_raster ))
 
-# ???
-  
-
-
-# Plot the cluster raster ... 
 # Define color palette
-pal_clust <- brewer.pal(n = nclust, "Accent")
-
-# trim and check the raster before plotting
-a <- trim(cluster_raster)
-
-# plot( a , col = pal_clust,
-#      main = "K-means Clustering Result" )
+pal_clust <- brewer.pal(n = nclust, "Accent") # Max for Accent is 8
 
 ckey <- list( at=0:nclust, 
               title="Clusters", 
               col = pal_clust)
 myTheme <- rasterTheme( region = pal_clust )
-levelplot( a, margin = F, 
+z_map <- levelplot( cluster_raster, margin = F, 
            colorkey = ckey,
            par.settings = myTheme,
            main = "K-means Clustering Result - Local extents" )
+z_map
 
-
-writeRaster( a, paste0( data_dir, "/foo.tif"), overwrite=TRUE)
-
+writeRaster( cluster_raster, paste0( data_dir, "/SPEC_6cluster.tif"), overwrite=TRUE)
 
 
 #---- ----
@@ -391,7 +334,7 @@ points(stack_data_clean[ outlier_idx, p_axes ], pch="+", col=4, cex=3)
 #---- Knit and render Markdown file -----
 ### Process file 
 # To HTML ... 
-rmarkdown::render( "Broughton.Rmd",   
+rmarkdown::render( "Broughton2.Rmd",   
                    output_format = 'html_document',
                    output_dir = rmd_dir )  
 
