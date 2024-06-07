@@ -13,7 +13,8 @@
 
 # check for any required packages that aren't installed and install them
 required.packages <- c( "ggplot2", "reshape2", "tidyr","dplyr", "raster", "stringr", "rasterVis",
-                        "RColorBrewer", "factoextra", "ggpubr", "cluster", "rmarkdown","lubridate" )
+                        "RColorBrewer", "factoextra", "ggpubr", "cluster", "rmarkdown","lubridate",
+                        "knitr")
 
 # "diffeR", "vegan", "ranger", "e1071", "forcats", "measures", "caret", "PresenceAbsence"
 # "randomForest", "spatialEco", "xlsx", "robustbase", "biomod2", "sp", "magrittr", "tinytex", "rmarkdown", "binr", 'gwxtab'

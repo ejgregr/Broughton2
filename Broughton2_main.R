@@ -105,16 +105,7 @@ par(mfrow = c(1, 1))
 #-- Quick correlation across data layers
 x <- getValues( prepped_layers )
 x_clean <- x[ complete.cases(x), ]
-y <- cor( x_clean )
-
-y_low <- lower.tri(y, diag = TRUE)
-y[ y_low ] <- NA
-y
-
-high_rows <- apply(y, 1, function(row) any(row > 0.6, na.rm = TRUE))
-z <- y[ high_rows, ]
-z
-
+cor_table <- cor( x_clean )
 
 #-- Remove any unwanted layers.
 #names( tif_stack)
@@ -179,7 +170,7 @@ z_heat <- ggplot(xm, aes(x=cluster, y=variable, fill=value) ) +
   scale_fill_gradientn(colours = pal_heat) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  labs(title = "Within-cluster Standard Deviation", x = "Clusters", y = "Attributes", fill = "Value")
+  labs(title = "", x = "Clusters", y = "Predictors", fill = "Value")
 z_heat
 
 #---- Part 2c: Examine silhouette plot of the WORKING clusters  ----

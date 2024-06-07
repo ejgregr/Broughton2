@@ -40,95 +40,43 @@ Dimensions of the loaded Raster stack.
 dim(prepped_layers)
 ```
 
-Plot the source data and corresponding histograms for validation.
-```{r echo=FALSE}
-#-- Visualize source data
-#plot( prepped_layers )
+```{r echo=FALSE, fig.cap="__*Figure 1: Maps of predictors scaled and trimmed to area of interest.*__"}
+plot( prepped_layers )
+par(mfrow = c(1, 1))
+```
+
+```{r echo=FALSE, fig.cap="__*Figure 2: Histograms of predictor data.*__"}
 raster::hist(prepped_layers, nclass=50)
 par(mfrow = c(1, 1))
 ```
 
+Examine correlations across predictors, and identify those beyond a threshold of 0.6.
+```{r echo=FALSE }
+# Global: cor_table 
 
-```{r echo=FALSE}
-#-- Quick correlation across data layers
-#x <- getValues( prepped_layers )
-x_clean <- x[ complete.cases(x), ]
-#y <- cor( x_clean )
-
-y_low <- lower.tri(y, diag = TRUE)
+y_low <- lower.tri(cor_table, diag = TRUE)
 y[ y_low ] <- NA
-y
+knitr::kable( y, caption = "Correlation matrix for assessing predictor cross-correlations")
 
-kable( y, caption = "Correlation matrix for assessing predictor cross-correlations")
-
-high_rows <- apply(y, 1, function(row) any(row > 0.6, na.rm = TRUE))
+x <- 0.6
+high_rows <- apply(cor_table, 1, function(row) any(row > x, na.rm = TRUE))
 z <- y[ high_rows, ]
-z
-
-kable( z, caption = "Predictor variables that exceed 0.6 threshold")
-
-#xx <- table( new.data$ORIGIN, new.data$INOR )
-#rownames(xx) <- c("Fry", "Marked smolts", "Unmarked smolts", "Total")
-#colnames(xx) <- c("Absent", "Present")
-#kable( xx, caption = "Presence/absence of inorganic matter in stomach samples by life history groups.")
-
+print( paste0( "Predictor variables that exceed ", x, " threshold:" ))
+print( "NEEDS FIXING - take it from previous push")
 ```
 
-__*Figure 1: Scree plot showing the total within sum-of-squares across a range of cluster numbers.*__
-```{r Part2_ScreePlot, warning=FALSE, message=FALSE, echo=FALSE}
+```{r Part2_ScreePlot, warning=FALSE, message=FALSE, echo=FALSE, fig.cap="__*Figure 3: Scree plot showing the total within sum-of-squares across a range of cluster numbers.*__"}
 plotme
 ```
 
-__*Figure 2: Heat map showing within cluster standard deviation of the predictors.*__
-```{r Part2_HeatMap, warning=FALSE, message=FALSE, echo=FALSE}
+```{r Part2_HeatMap, warning=FALSE, message=FALSE, echo=FALSE, fig.cap="__*Figure 4: Heat map showing within cluster standard deviation of the predictors.*__"}
 z_heat
 ```
 
-NOTES:  
-1) ... 
-2) ...
-
-# Methods
-To compare classifications across different spatial extents. 
-
-*italics?* 
-**bold?** 
-
-<!-- Is this a text comment?
-<!-- ``` -->
-
-__*Figure 3: Silhouette plot showing pixel membership in each cluster and silhouette widths.*__
-```{r Part2_DataSummary, warning=FALSE, message=FALSE, echo=FALSE}
+```{r Part2_DataSummary, warning=FALSE, message=FALSE, echo=FALSE, fig.cap="__*Figure 5: Silhouette plot showing pixel membership in each cluster and silhouette widths.*__"}
 plot(sk, col = 1:nclust, border=NA )
 ```
 
-
-
-
-
-## R packages
-
-dplyr: A fast, consistent set of tools for working with data frame like objects, both in memory and out of memory.  
-
-ggplot2: A system for 'declaratively' creating graphics based on ``The Grammar of Graphics''. You provide the data, tell 'ggplot2' how to map variables to aesthetics, what graphical primitives to use, and it takes care of the details. 
-Hmisc: Contains many functions useful for data analysis, high-level graphics, utility operations, functions for computing sample size and power, simulation, importing and annotating datasets,
-imputing missing values, advanced table making, variable clustering, character string manipulation, conversion of R objects to LaTeX and html code, and recoding variables. Used here to add standard deviation to as lines to ggplot.
-
-knitr: Provides a general-purpose tool for dynamic report generation in R using Literate Programming techniques. Used here for Markdown formatting as html or pdf.
-
-lubridate : Functions to work with date-times and time-spans: fast and user friendly parsing of date-time data, extraction and updating of components of a date-time (years, months, days, hours, minutes, and seconds), algebraic manipulation on date-time and time-span objects. Used here to pool dates to month.
-
-markdown: R Markdown allows the use of knitr and Pandoc in the R environment. This package translates R Markdown to standard Markdown that knitr and Pandoc render to the desired output format (e.g., PDF, HTML, Word, etc).
-
-purrr: A complete and consistent functional programming toolkit for data manupulation in R.  
-
-readxl: Imports excel files into R.  
-
-reshape2: Flexibly restructure and aggregate data using just two functions: melt and 'dcast'. Used here for ggplot() support. 
-
-tibble: Functions for manipulating the tibble data format in R. Used here for the deframe() function.  
-
-vegan: Ordination methods, diversity analysis and other functions for community and vegetation ecologists.  
 
 # Results
 
@@ -165,4 +113,28 @@ __*Figure 4: Metrics for each group by MONTH, faceted by TRANSECT.*__
 More text
 
 ### Heading 3
+
+## R packages
+
+dplyr: A fast, consistent set of tools for working with data frame like objects, both in memory and out of memory.  
+
+ggplot2: A system for 'declaratively' creating graphics based on ``The Grammar of Graphics''. You provide the data, tell 'ggplot2' how to map variables to aesthetics, what graphical primitives to use, and it takes care of the details. 
+Hmisc: Contains many functions useful for data analysis, high-level graphics, utility operations, functions for computing sample size and power, simulation, importing and annotating datasets,
+imputing missing values, advanced table making, variable clustering, character string manipulation, conversion of R objects to LaTeX and html code, and recoding variables. Used here to add standard deviation to as lines to ggplot.
+
+knitr: Provides a general-purpose tool for dynamic report generation in R using Literate Programming techniques. Used here for Markdown formatting as html or pdf.
+
+lubridate : Functions to work with date-times and time-spans: fast and user friendly parsing of date-time data, extraction and updating of components of a date-time (years, months, days, hours, minutes, and seconds), algebraic manipulation on date-time and time-span objects. Used here to pool dates to month.
+
+markdown: R Markdown allows the use of knitr and Pandoc in the R environment. This package translates R Markdown to standard Markdown that knitr and Pandoc render to the desired output format (e.g., PDF, HTML, Word, etc).
+
+purrr: A complete and consistent functional programming toolkit for data manupulation in R.  
+
+readxl: Imports excel files into R.  
+
+reshape2: Flexibly restructure and aggregate data using just two functions: melt and 'dcast'. Used here for ggplot() support. 
+
+tibble: Functions for manipulating the tibble data format in R. Used here for the deframe() function.  
+
+vegan: Ordination methods, diversity analysis and other functions for community and vegetation ecologists.  
 
