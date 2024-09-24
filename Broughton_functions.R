@@ -90,6 +90,23 @@ Integerize <- function( in_layers, sig = 1000 ) {
   return( int_layers )
 }
 
+
+PlotHists <- function( stack_dat ) {
+  sk_list <- NULL
+  w <- colnames(stack_dat)
+  
+  for (i in 1:dim( stack_dat )[2]){
+    x <- stack_dat[,i]
+    y <- skewness(x, na.rm = TRUE)
+    sk_list <- c(sk_list, y)
+    y <- paste0( "Skew=", round(y, 3))
+    hist( x, main = w[i] )
+    xy <- par("usr")
+    xyrange <- c( xy[2]-xy[1], xy[4]-xy[3] )
+    text( xy[1]+xyrange[1]/4, xy[4]-xyrange[2]/10, y )
+  }
+}
+
 #---- Four layers that needed some work. ----
 #Includes 4: julBS_ave, julSS_min, julSSpd_ave, tidal_cur
 MakeMoreNormal <- function( the_stack, t_list ){

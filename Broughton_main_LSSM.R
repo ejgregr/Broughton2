@@ -107,48 +107,30 @@ selected_stack <- dropLayer( tif_stack, c("julST_ave", "julSS_ave", "julBSpd_ave
 names( selected_stack )
 
 stack_data <- getValues( selected_stack )
-stack_data_clean <- stack_data[ complete.cases(stack_data), ]
+
+# remove any rows with an NA
+# NB: This decouples the data from the RasterStack and requires re-assembly for mapping
+# THESE are the two key data structures used in subsequent steps
+clean_idx <- complete.cases(stack_data)
+stack_data_clean <- stack_data[ clean_idx, ]
 
 dim( stack_data )
 dim( stack_data_clean )
 
-
 # Transform and scale the data for k-means classification.
-
-PlotHists <- function( stack_dat ) {
-  sk_list <- NULL
-  w <- colnames(stack_dat)
-
-    for (i in 1:dim( stack_dat )[2]){
-    x <- stack_dat[,i]
-    y <- skewness(x, na.rm = TRUE)
-    sk_list <- c(sk_list, y)
-    y <- paste0( "Skew=", round(y, 3))
-    hist( x, main = w[i] )
-    xy <- par("usr")
-    xyrange <- c( xy[2]-xy[1], xy[4]-xy[3] )
-    text( xy[1]+xyrange[1]/4, xy[4]-xyrange[2]/10, y )
-  }
-}
 
 print( "Transforming data  ... ")
   # Transform those predictors with abs(skew) > 1. 
   #Includes 4: julBS_ave, julSS_min, julSSpd_ave, tidal_cur
-
-par(mfrow = c(3, 3) )
-PlotHists(stack_data_clean )
 t_stack_data <- MakeMoreNormal(stack_data_clean)
-PlotHists(t_stack_data )
 
 print("Centering and scaling  ... ")
 tmp_stack <- scale(t_stack_data, center = T,  scale = T)
 t_stack_data <- tmp_stack
 print('Data prepped.')
-save(t_stack_data,
-     file = paste0(data_dir, '/t_stack_data', today, '.rData'))
-print('Scaled data saved.')
-
-
+#save(t_stack_data,
+#     file = paste0(data_dir, '/t_stack_data', today, '.rData'))
+#print('Scaled data saved.')
 
 #---- Part 2 of 3: Cluster number selection ----
 
@@ -166,7 +148,7 @@ plotme
 
 #---- Create a working set of N clusters (N based on scree plot) to further assess cluster number. ----
 
-nclust  <- 5 # the number of clusters based on scree plot, above.
+nclust  <- 8 # the number of clusters based on scree plot, above.
 nsample <- 500000 # a larger sample for more robust classification
 
 sidx <- sample( 1:length( t_stack_data[ , 1] ), nsample )
@@ -213,7 +195,6 @@ c_dist <- dist(ss)
 sk <- silhouette(cs, c_dist)
 #mean( sk[,"sil_width"] )
 
-par(mfrow = c(1, 1))
 plot(sk, col = 1:nclust, border=NA, main = "" )
 
 
@@ -255,7 +236,7 @@ vplots
 #     b) Predict to the unsampled portion of the raster. 
 
 # initialize target data structure 
-cluster_raster <- prepped_layers[[1]]
+cluster_raster <- selected_stack[[1]]
 dataType(cluster_raster) <- "INT1U"
 cluster_raster[] <- NA
 
@@ -291,8 +272,7 @@ z_map <- levelplot( cluster_raster, margin = F,
            par.settings = myTheme,
            main = "K-means Clustering Result - Local extents" )
 z_map
-writeRaster( cluster_raster, paste0( data_dir, "/SPEC_7clusterb.tif"), overwrite=TRUE)
-
+writeRaster( cluster_raster, paste0( results_dir, "/SPEC_8clusterb.tif"), overwrite=TRUE)
 
 
 #---- Knit and render Markdown file to PDF -----
@@ -300,9 +280,10 @@ writeRaster( cluster_raster, paste0( data_dir, "/SPEC_7clusterb.tif"), overwrite
 # then run >tinytex::install_tinytex()
 # ... and done. 
 rmarkdown::render( "Broughton_LSSM_PDF.Rmd",   
-                   output_format = 'pdf_document',
+#rmarkdown::render( "Broughton_test.Rmd",   
+                                      output_format = 'pdf_document',
                    output_dir ="C:/Data/Git/Broughton_LSSM/Results",
-                   output_file = paste0( "LSSM_gdata_5cluster_", today ))
+                   output_file = paste0( "LSSM_gdata_8cluster_", today ))
 
 
 #---- Some details on correlation analysis ... ----
